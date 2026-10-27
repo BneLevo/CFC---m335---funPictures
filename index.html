@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>FunPictures</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #111; color: #fff; font-family: system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header button { background: #2a2a2a; color: #fff; border: 0; border-radius: 20px; padding: 8px 14px; font-size: 14px; }
+  #install { display: none; }
+  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+  canvas#view { max-width: 100%; max-height: 100%; background: #000; }
+  #msg { position: absolute; padding: 20px; text-align: center; max-width: 320px; display: none; }
+  #strip { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; }
+  .chip { flex: none; background: #2a2a2a; color: #fff; border: 2px solid transparent; border-radius: 20px; padding: 8px 14px; font-size: 14px; }
+  .chip.on { border-color: #ff4f8b; background: #3a2230; }
+  #bar { display: flex; align-items: center; justify-content: space-around; padding: 6px 14px 14px; }
+  #shot { width: 72px; height: 72px; border-radius: 50%; border: 5px solid #fff; background: #ff4f8b; }
+  #shot:active { transform: scale(.92); }
+  .round { width: 48px; height: 48px; border-radius: 50%; border: 0; background: #2a2a2a; color: #fff; font-size: 22px; }
+  #gallery { display: flex; gap: 6px; overflow-x: auto; padding: 0 14px 8px; min-height: 0; }
+  #gallery img { height: 56px; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>📸 FunPictures</h1>
+    <button id="install">Installer</button>
+  </header>
+
+  <main>
+    <canvas id="view"></canvas>
+    <div id="msg"></div>
+  </main>
+
+  <div id="strip"></div>
+  <div id="gallery"></div>
+
+  <div id="bar">
+    <span style="width:48px"></span>
+    <button id="shot" aria-label="Prendre une photo"></button>
+    <button class="round" id="flip" aria-label="Changer de caméra">🔄</button>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const canvas = $('view');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const video = document.createElement('video');
+video.playsInline = true; video.muted = true;
+const small = document.createElement('canvas'); // pour l'effet pixel
+const sctx = small.getContext('2d');
+
+let stream = null, facing = 'environment', current = 'normal';
+const MAX_W = 720;
+
+// --- Filtres : chacun modifie directement les pixels (RGBA) ---
+const clamp = v => v < 0 ? 0 : v > 255 ? 255 : v;
+const filters = {
+  normal:   { label: 'Normal' },
+  noir:     { label: 'Noir & blanc', fn(d) { for (let i = 0; i < d.length; i += 4) { const g = .3*d[i] + .59*d[i+1] + .11*d[i+2]; d[i] = d[i+1] = d[i+2] = g; } } },
+  sepia:    { label: 'Sépia', fn(d) { for (let i = 0; i < d.length; i += 4) { const r = d[i], g = d[i+1], b = d[i+2];
+              d[i] = clamp(.393*r + .769*g + .189*b); d[i+1] = clamp(.349*r + .686*g + .168*b); d[i+2] = clamp(.272*r + .534*g + .131*b); } } },
+  negatif:  { label: 'Négatif', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i] = 255 - d[i]; d[i+1] = 255 - d[i+1]; d[i+2] = 255 - d[i+2]; } } },
+  rouge:    { label: 'Rouge', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i+1] *= .2; d[i+2] *= .2; d[i] = clamp(d[i] * 1.3); } } },
+  bleu:     { label: 'Bleu', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i] *= .2; d[i+1] *= .5; d[i+2] = clamp(d[i+2] * 1.4); } } },
+  pop:      { label: 'Pop', fn(d) { for (let i = 0; i < d.length; i += 4) { const g = (d[i] + d[i+1] + d[i+2]) / 3;
+              for (let c = 0; c < 3; c++) d[i+c] = clamp((g + (d[i+c] - g) * 2) * 1.1 + (d[i+c] - 128) * .2); } } },
+  poster:   { label: 'Poster', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i] = Math.round(d[i]/64)*64; d[i+1] = Math.round(d[i+1]/64)*64; d[i+2] = Math.round(d[i+2]/64)*64; } } },
+  pixel:    { label: 'Pixel' }   // géré dans draw()
+};
+
+const strip = $('strip');
+Object.entries(filters).forEach(([key, f]) => {
+  const b = document.createElement('button');
+  b.className = 'chip' + (key === current ? ' on' : '');
+  b.textContent = f.label;
+  b.onclick = () => { current = key; strip.querySelectorAll('.chip').forEach(c => c.classList.remove('on')); b.classList.add('on'); };
+  strip.appendChild(b);
+});
+
+// --- Caméra ---
+function showMsg(t) { $('msg').textContent = t; $('msg').style.display = t ? 'block' : 'none'; }
+
+async function start() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    showMsg('');
+  } catch (e) {
+    showMsg("Impossible d'accéder à la caméra. Autorise-la dans le navigateur (le site doit être en HTTPS).");
+  }
+}
+
+function draw() {
+  if (video.readyState >= 2 && video.videoWidth) {
+    const s = Math.min(1, MAX_W / video.videoWidth);
+    const w = Math.round(video.videoWidth * s), h = Math.round(video.videoHeight * s);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+
+    ctx.save();
+    if (facing === 'user') { ctx.translate(w, 0); ctx.scale(-1, 1); } // effet miroir pour le selfie
+    if (current === 'pixel') {
+      small.width = Math.round(w / 14); small.height = Math.round(h / 14);
+      sctx.drawImage(video, 0, 0, small.width, small.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(small, 0, 0, w, h);
+    } else {
+      ctx.drawImage(video, 0, 0, w, h);
+    }
+    ctx.restore();
+
+    const fn = filters[current].fn;
+    if (fn) {
+      const img = ctx.getImageData(0, 0, w, h);
+      fn(img.data);
+      ctx.putImageData(img, 0, 0);
+    }
+  }
+  requestAnimationFrame(draw);
+}
+
+// --- Photo ---
+$('shot').onclick = () => {
+  if (!canvas.width) return;
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.src = url;
+    img.title = 'Toucher pour télécharger';
+    img.onclick = () => { const a = document.createElement('a'); a.href = url; a.download = 'funpicture-' + Date.now() + '.png'; a.click(); };
+    $('gallery').prepend(img);
+  }, 'image/png');
+};
+
+$('flip').onclick = () => { facing = facing === 'user' ? 'environment' : 'user'; start(); };
+
+// --- PWA : service worker + bouton d'installation ---
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+let deferred;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; $('install').style.display = 'block'; });
+$('install').onclick = async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; $('install').style.display = 'none'; };
+
+start();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
