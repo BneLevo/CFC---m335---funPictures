@@ -1,161 +1,177 @@
 <!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#111111">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>FunPictures</title>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000"><link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><title>FunPictures</title>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; background: #111; color: #fff; font-family: system-ui, sans-serif; }
-  body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
-  header h1 { font-size: 18px; margin: 0; }
-  header button { background: #2a2a2a; color: #fff; border: 0; border-radius: 20px; padding: 8px 14px; font-size: 14px; }
-  #install { display: none; }
-  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
-  canvas#view { max-width: 100%; max-height: 100%; background: #000; }
-  #msg { position: absolute; padding: 20px; text-align: center; max-width: 320px; display: none; }
-  #strip { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; }
-  .chip { flex: none; background: #2a2a2a; color: #fff; border: 2px solid transparent; border-radius: 20px; padding: 8px 14px; font-size: 14px; }
-  .chip.on { border-color: #ff4f8b; background: #3a2230; }
-  #bar { display: flex; align-items: center; justify-content: space-around; padding: 6px 14px 14px; }
-  #shot { width: 72px; height: 72px; border-radius: 50%; border: 5px solid #fff; background: #ff4f8b; }
-  #shot:active { transform: scale(.92); }
-  .round { width: 48px; height: 48px; border-radius: 50%; border: 0; background: #2a2a2a; color: #fff; font-size: 22px; }
-  #gallery { display: flex; gap: 6px; overflow-x: auto; padding: 0 14px 8px; min-height: 0; }
-  #gallery img { height: 56px; border-radius: 6px; }
-</style>
-</head>
-<body>
-  <header>
-    <h1>📸 FunPictures</h1>
-    <button id="install">Installer</button>
-  </header>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:#000;color:#fff;font:15px system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#out{max-width:100%;max-height:100%;touch-action:none}
+.ui{position:fixed;left:0;right:0;padding:0 12px;display:flex;align-items:center;gap:8px}
+#top{top:calc(env(safe-area-inset-top) + 8px);justify-content:space-between}
+#bot{bottom:0;flex-direction:column;align-items:stretch;padding:24px 0 calc(env(safe-area-inset-bottom) + 10px);background:linear-gradient(#0000,#000c 35%)}
+.row{display:flex;align-items:center;gap:8px;padding:0 12px;overflow-x:auto;scrollbar-width:none}
+.b{flex:none;border:2px solid transparent;border-radius:20px;background:#2a2a2acc;color:#fff;padding:8px 13px;font-size:14px}
+.b.on{border-color:#ff4f8b;background:#3a2230}
+.r{width:48px;height:48px;border-radius:50%;padding:0;font-size:22px}
+#range{flex:1;accent-color:#ff4f8b}
+#mid{justify-content:space-around}
+#shot{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:#ff4f8b;transition:.15s}
+#shot.rec{background:#e11;border-radius:18px;width:62px;height:62px}
+#cd{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:30vmin;font-weight:700;text-shadow:0 0 30px #000;pointer-events:none}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+#flash.go{animation:fl .35s}@keyframes fl{from{opacity:.9}to{opacity:0}}
+#msg{position:fixed;top:40%;left:0;right:0;text-align:center;padding:20px}
+.ov{position:fixed;inset:0;background:#111;overflow:auto;padding:calc(env(safe-area-inset-top) + 10px) 10px 10px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:10px}
+#grid img,#grid video{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#222}
+#vw{background:#000;display:flex;flex-direction:column;align-items:center;gap:10px}
+#vm{flex:1;min-height:0;display:flex}#vm img,#vm video{max-width:100%;max-height:100%;margin:auto}
+</style></head><body>
+<div id="stage"><canvas id="out"></canvas></div>
+<div id="msg" hidden></div><div id="cd" hidden></div><div id="flash"></div>
 
-  <main>
-    <canvas id="view"></canvas>
-    <div id="msg"></div>
-  </main>
+<div id="top" class="ui"><b>📸 FunPictures</b><button class="b" id="install" hidden>Installer</button></div>
 
-  <div id="strip"></div>
-  <div id="gallery"></div>
+<div id="bot" class="ui">
+  <div class="row"><span id="ilabel">Intensité</span><input id="range" type="range" min="0" max="100" value="70">
+    <button class="b" id="tbtn">⏱ off</button><button class="b" id="sbtn">😀</button><button class="b" id="clr">🗑</button></div>
+  <div class="row" id="tray" hidden></div>
+  <div class="row" id="fxs"></div>
+  <div class="row" style="justify-content:center"><button class="b on" id="mP">Photo</button><button class="b" id="mV">Vidéo</button></div>
+  <div class="row" id="mid"><button class="b r" id="gbtn" style="font-size:13px">🖼</button><button id="shot" aria-label="Déclencheur"></button><button class="b r" id="flip">🔄</button></div>
+</div>
 
-  <div id="bar">
-    <span style="width:48px"></span>
-    <button id="shot" aria-label="Prendre une photo"></button>
-    <button class="round" id="flip" aria-label="Changer de caméra">🔄</button>
-  </div>
+<div id="gal" class="ov" hidden><button class="b" id="gx">← Retour</button><div id="grid"></div></div>
+<div id="vw" class="ov" hidden><div id="vm"></div>
+  <div class="row"><button class="b" id="sh">Partager</button><button class="b" id="dl">Télécharger</button><button class="b" id="del">Supprimer</button><button class="b" id="vx">Fermer</button></div></div>
 
 <script>
-const $ = id => document.getElementById(id);
-const canvas = $('view');
-const ctx = canvas.getContext('2d', { willReadFrequently: true });
-const video = document.createElement('video');
-video.playsInline = true; video.muted = true;
-const small = document.createElement('canvas'); // pour l'effet pixel
-const sctx = small.getContext('2d');
+const $=s=>document.querySelector(s),out=$('#out'),octx=out.getContext('2d');
+const glc=document.createElement('canvas'),g=glc.getContext('webgl',{alpha:false});
+const trail=document.createElement('canvas'),tctx=trail.getContext('2d');
+const vid=document.createElement('video');vid.playsInline=vid.muted=true;
+const FX=['✨ Normal','⚫ Noir & blanc','🟤 Sépia','🔁 Négatif','🔥 Thermique','💡 Néon','🎨 Cartoon','📺 Glitch','🔷 Kaléido','🔍 Loupe','🌀 Tourbillon','🌊 Vague','🟦 Pixel','🪞 Miroir','👻 Fantôme'];
+let fx=0,k=.7,mode='photo',facing='environment',stream,rec=null,stickers=[],timer=0,busy=false;
 
-let stream = null, facing = 'environment', current = 'normal';
-const MAX_W = 720;
+/* ---------- Shader : tous les effets dans un seul fragment shader ---------- */
+const VS='attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}';
+const FS=`precision mediump float;varying vec2 v;uniform sampler2D t;uniform float fx,k,time,mir;uniform vec2 px;
+vec3 S(vec2 u){return texture2D(t,u).rgb;}
+float L(vec3 c){return dot(c,vec3(.3,.59,.11));}
+float E(vec2 u){return length(vec2(L(S(u+vec2(px.x,0.)))-L(S(u-vec2(px.x,0.))),L(S(u+vec2(0.,px.y)))-L(S(u-vec2(0.,px.y)))));}
+bool is(float a){return abs(fx-a)<.5;}
+void main(){
+ vec2 w=vec2(mir>.5?1.-v.x:v.x,v.y),u=w,c=u-.5;float r=length(c);
+ if(is(8.)){float a=atan(c.y,c.x),n=6.;a=abs(mod(a,6.2832/n)-3.1416/n);u=mix(w,.5+r*vec2(cos(a),sin(a)),k);}
+ if(is(9.))u=.5+c*(1.-k*.8*(1.-r*1.414));
+ if(is(10.)){float a=k*6.*max(.7-r,0.);u=.5+mat2(cos(a),-sin(a),sin(a),cos(a))*c;}
+ if(is(11.)){u.x+=sin(u.y*20.+time*3.)*.025*k;u.y+=cos(u.x*20.+time*3.)*.025*k;}
+ if(is(12.)){float n=mix(300.,25.,k);u=(floor(u*n)+.5)/n;}
+ if(is(13.))u.x=u.x>.5?1.-u.x:u.x;
+ vec3 o;
+ if(is(7.)){float row=floor(u.y*20.);u.x+=step(.8,fract(sin(row+floor(time*6.))*43758.5))*k*.08;
+  o=vec3(S(u+vec2(k*.02,0.)).r,S(u).g,S(u-vec2(k*.02,0.)).b);}
+ else o=S(u);
+ vec3 q=o;
+ if(is(1.))q=vec3(L(o));
+ if(is(2.))q=vec3(dot(o,vec3(.393,.769,.189)),dot(o,vec3(.349,.686,.168)),dot(o,vec3(.272,.534,.131)));
+ if(is(3.))q=1.-o;
+ if(is(4.)){float l=L(o);q=clamp(vec3(l*3.,l*3.-1.,l*3.-2.),0.,1.)+vec3(0.,0.,.35*(1.-l));}
+ if(is(5.)){float e=clamp(E(u)*4.,0.,1.);q=o*.12+e*vec3(1.,.2,.8)+e*e*vec3(.1,.9,1.);}
+ if(is(6.)){float e=E(u);q=floor(o*4.+.5)/4.*(1.-smoothstep(.12,.35,e));}
+ if(fx>.5&&fx<6.5)q=mix(S(w),q,k);
+ gl_FragColor=vec4(q,1.);}`;
+const sh=(t,s)=>{const o=g.createShader(t);g.shaderSource(o,s);g.compileShader(o);return o};
+const pr=g.createProgram();g.attachShader(pr,sh(g.VERTEX_SHADER,VS));g.attachShader(pr,sh(g.FRAGMENT_SHADER,FS));g.linkProgram(pr);g.useProgram(pr);
+g.bindBuffer(g.ARRAY_BUFFER,g.createBuffer());g.bufferData(g.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),g.STATIC_DRAW);
+const loc=g.getAttribLocation(pr,'p');g.enableVertexAttribArray(loc);g.vertexAttribPointer(loc,2,g.FLOAT,false,0,0);
+g.bindTexture(g.TEXTURE_2D,g.createTexture());
+[g.TEXTURE_WRAP_S,g.TEXTURE_WRAP_T].forEach(p=>g.texParameteri(g.TEXTURE_2D,p,g.CLAMP_TO_EDGE));
+[g.TEXTURE_MIN_FILTER,g.TEXTURE_MAG_FILTER].forEach(p=>g.texParameteri(g.TEXTURE_2D,p,g.LINEAR));
+g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,true);
+const U={};['fx','k','time','mir','px'].forEach(n=>U[n]=g.getUniformLocation(pr,n));
 
-// --- Filtres : chacun modifie directement les pixels (RGBA) ---
-const clamp = v => v < 0 ? 0 : v > 255 ? 255 : v;
-const filters = {
-  normal:   { label: 'Normal' },
-  noir:     { label: 'Noir & blanc', fn(d) { for (let i = 0; i < d.length; i += 4) { const g = .3*d[i] + .59*d[i+1] + .11*d[i+2]; d[i] = d[i+1] = d[i+2] = g; } } },
-  sepia:    { label: 'Sépia', fn(d) { for (let i = 0; i < d.length; i += 4) { const r = d[i], g = d[i+1], b = d[i+2];
-              d[i] = clamp(.393*r + .769*g + .189*b); d[i+1] = clamp(.349*r + .686*g + .168*b); d[i+2] = clamp(.272*r + .534*g + .131*b); } } },
-  negatif:  { label: 'Négatif', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i] = 255 - d[i]; d[i+1] = 255 - d[i+1]; d[i+2] = 255 - d[i+2]; } } },
-  rouge:    { label: 'Rouge', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i+1] *= .2; d[i+2] *= .2; d[i] = clamp(d[i] * 1.3); } } },
-  bleu:     { label: 'Bleu', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i] *= .2; d[i+1] *= .5; d[i+2] = clamp(d[i+2] * 1.4); } } },
-  pop:      { label: 'Pop', fn(d) { for (let i = 0; i < d.length; i += 4) { const g = (d[i] + d[i+1] + d[i+2]) / 3;
-              for (let c = 0; c < 3; c++) d[i+c] = clamp((g + (d[i+c] - g) * 2) * 1.1 + (d[i+c] - 128) * .2); } } },
-  poster:   { label: 'Poster', fn(d) { for (let i = 0; i < d.length; i += 4) { d[i] = Math.round(d[i]/64)*64; d[i+1] = Math.round(d[i+1]/64)*64; d[i+2] = Math.round(d[i+2]/64)*64; } } },
-  pixel:    { label: 'Pixel' }   // géré dans draw()
-};
+/* ---------- Boucle de rendu : shader -> traînée -> autocollants ---------- */
+function frame(ms){
+ if(vid.readyState>=2&&vid.videoWidth){
+  const s=Math.min(1,1280/Math.max(vid.videoWidth,vid.videoHeight)),w=Math.round(vid.videoWidth*s),h=Math.round(vid.videoHeight*s);
+  if(glc.width!==w||glc.height!==h)glc.width=out.width=trail.width=w,glc.height=out.height=trail.height=h;
+  g.viewport(0,0,w,h);g.texImage2D(g.TEXTURE_2D,0,g.RGB,g.RGB,g.UNSIGNED_BYTE,vid);
+  g.uniform1f(U.fx,fx===14?0:fx);g.uniform1f(U.k,k);g.uniform1f(U.time,ms/1000%1000);
+  g.uniform1f(U.mir,facing==='user'?1:0);g.uniform2f(U.px,1/w,1/h);g.drawArrays(g.TRIANGLE_STRIP,0,4);
+  tctx.globalAlpha=fx===14?Math.max(.03,.3*(1-k)):1;tctx.drawImage(glc,0,0);
+  octx.drawImage(trail,0,0);octx.textAlign='center';octx.textBaseline='middle';
+  stickers.forEach(e=>{octx.font=e.z*h+'px serif';octx.fillText(e.e,e.x*w,e.y*h)});
+ }
+ requestAnimationFrame(frame)}
 
-const strip = $('strip');
-Object.entries(filters).forEach(([key, f]) => {
-  const b = document.createElement('button');
-  b.className = 'chip' + (key === current ? ' on' : '');
-  b.textContent = f.label;
-  b.onclick = () => { current = key; strip.querySelectorAll('.chip').forEach(c => c.classList.remove('on')); b.classList.add('on'); };
-  strip.appendChild(b);
-});
+/* ---------- Caméra ---------- */
+async function start(){
+ stream&&stream.getTracks().forEach(t=>t.stop());
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:false});
+  vid.srcObject=stream;await vid.play();$('#msg').hidden=true}
+ catch(e){$('#msg').hidden=false;$('#msg').textContent="Caméra inaccessible. Autorise-la dans le navigateur (HTTPS obligatoire)."}}
+$('#flip').onclick=()=>{facing=facing==='user'?'environment':'user';start()};
 
-// --- Caméra ---
-function showMsg(t) { $('msg').textContent = t; $('msg').style.display = t ? 'block' : 'none'; }
+/* ---------- Interface : effets, réglage, autocollants ---------- */
+FX.forEach((n,i)=>{const b=document.createElement('button');b.className='b'+(i?'':' on');b.textContent=n;
+ b.onclick=()=>{fx=i;document.querySelectorAll('#fxs .b').forEach(x=>x.classList.remove('on'));b.classList.add('on')};$('#fxs').append(b)});
+$('#range').oninput=e=>k=e.target.value/100;
+'😎🕶️🎩👑🔥💥⭐❤️🌈👻🐱🦄🎉💬'.match(/\p{Extended_Pictographic}\uFE0F?/gu).forEach(e=>{const b=document.createElement('button');b.className='b';b.textContent=e;
+ b.onclick=()=>stickers.push({e,x:.5,y:.5,z:.2});$('#tray').append(b)});
+$('#sbtn').onclick=()=>$('#tray').hidden=!$('#tray').hidden;$('#clr').onclick=()=>stickers=[];
+$('#tbtn').onclick=()=>{timer=timer===0?3:timer===3?10:0;$('#tbtn').textContent='⏱ '+(timer?timer+'s':'off')};
+$('#mP').onclick=()=>setMode('photo');$('#mV').onclick=()=>setMode('video');
+function setMode(m){if(rec)return;mode=m;$('#mP').classList.toggle('on',m==='photo');$('#mV').classList.toggle('on',m==='video')}
 
-async function start() {
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
-    });
-    video.srcObject = stream;
-    await video.play();
-    showMsg('');
-  } catch (e) {
-    showMsg("Impossible d'accéder à la caméra. Autorise-la dans le navigateur (le site doit être en HTTPS).");
-  }
-}
+let drag=null;const pos=e=>{const r=out.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height,r]};
+out.onpointerdown=e=>{const[x,y,r]=pos(e);const s=[...stickers].reverse().find(s=>Math.hypot((s.x-x)*r.width,(s.y-y)*r.height)<s.z*r.height*.6);
+ if(s){drag={s,moved:false};out.setPointerCapture(e.pointerId)}};
+out.onpointermove=e=>{if(!drag)return;const[x,y]=pos(e);drag.s.x=x;drag.s.y=y;drag.moved=true};
+out.onpointerup=()=>{if(drag&&!drag.moved){const Z=[.12,.2,.32];drag.s.z=Z[(Z.indexOf(drag.s.z)+1)%3]}drag=null};
 
-function draw() {
-  if (video.readyState >= 2 && video.videoWidth) {
-    const s = Math.min(1, MAX_W / video.videoWidth);
-    const w = Math.round(video.videoWidth * s), h = Math.round(video.videoHeight * s);
-    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+/* ---------- Stockage local (IndexedDB) ---------- */
+const db=new Promise((ok,ko)=>{const r=indexedDB.open('funpictures',1);r.onupgradeneeded=()=>r.result.createObjectStore('m',{keyPath:'id',autoIncrement:true});r.onsuccess=()=>ok(r.result);r.onerror=ko});
+const tx=async(mode,f)=>{const d=await db;return new Promise((ok,ko)=>{const q=f(d.transaction('m',mode).objectStore('m'));q.onsuccess=()=>ok(q.result);q.onerror=ko})};
+const count=async()=>$('#gbtn').textContent='🖼 '+await tx('readonly',s=>s.count());
+const save=async(blob,type)=>{await tx('readwrite',s=>s.add({blob,type,t:Date.now()}));count()};
+count();
 
-    ctx.save();
-    if (facing === 'user') { ctx.translate(w, 0); ctx.scale(-1, 1); } // effet miroir pour le selfie
-    if (current === 'pixel') {
-      small.width = Math.round(w / 14); small.height = Math.round(h / 14);
-      sctx.drawImage(video, 0, 0, small.width, small.height);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(small, 0, 0, w, h);
-    } else {
-      ctx.drawImage(video, 0, 0, w, h);
-    }
-    ctx.restore();
+/* ---------- Photo / vidéo ---------- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+$('#shot').onclick=async()=>{
+ if(rec){rec.stop();return}if(busy||!out.width)return;busy=true;
+ for(let n=timer;n>0;n--){$('#cd').hidden=false;$('#cd').textContent=n;await sleep(1000)}$('#cd').hidden=true;busy=false;
+ if(mode==='photo'){$('#flash').classList.remove('go');void $('#flash').offsetWidth;$('#flash').classList.add('go');out.toBlob(b=>save(b,'image/jpeg'),'image/jpeg',.92)}
+ else startRec()};
+async function startRec(){
+ const s=out.captureStream(30);
+ try{(await navigator.mediaDevices.getUserMedia({audio:true})).getAudioTracks().forEach(t=>s.addTrack(t))}catch{}
+ const mt=['video/mp4','video/webm;codecs=vp9,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m))||'',ch=[],r=new MediaRecorder(s,mt?{mimeType:mt}:{}),t0=Date.now();
+ r.ondataavailable=e=>e.data.size&&ch.push(e.data);
+ const iv=setInterval(()=>$('#ilabel').textContent='🔴 '+Math.floor((Date.now()-t0)/1000)+'s',500);
+ r.onstop=()=>{clearInterval(iv);$('#ilabel').textContent='Intensité';$('#shot').classList.remove('rec');
+  s.getTracks().forEach(t=>t.stop());save(new Blob(ch,{type:r.mimeType}),r.mimeType);rec=null};
+ r.start();rec=r;$('#shot').classList.add('rec')}
 
-    const fn = filters[current].fn;
-    if (fn) {
-      const img = ctx.getImageData(0, 0, w, h);
-      fn(img.data);
-      ctx.putImageData(img, 0, 0);
-    }
-  }
-  requestAnimationFrame(draw);
-}
+/* ---------- Galerie ---------- */
+async function openGal(){const items=(await tx('readonly',s=>s.getAll())).reverse(),G=$('#grid');G.innerHTML='';
+ items.forEach(m=>{const u=URL.createObjectURL(m.blob),v=m.type.startsWith('video'),el=document.createElement(v?'video':'img');
+  el.src=u;if(v){el.muted=true;el.preload='metadata'}el.onclick=()=>view(m,u,v);G.append(el)});$('#gal').hidden=false}
+function view(m,u,v){
+ const ext=v?(m.type.includes('mp4')?'mp4':'webm'):'jpg',f=new File([m.blob],'funpictures-'+m.t+'.'+ext,{type:m.type});
+ $('#vm').innerHTML=v?`<video src="${u}" controls autoplay playsinline></video>`:`<img src="${u}">`;$('#vw').hidden=false;
+ $('#sh').onclick=()=>navigator.canShare&&navigator.canShare({files:[f]})?navigator.share({files:[f]}).catch(()=>{}):$('#dl').click();
+ $('#dl').onclick=()=>{const a=document.createElement('a');a.href=u;a.download=f.name;a.click()};
+ $('#del').onclick=async()=>{await tx('readwrite',s=>s.delete(m.id));$('#vw').hidden=true;count();openGal()}}
+$('#gbtn').onclick=openGal;$('#gx').onclick=()=>$('#gal').hidden=true;$('#vx').onclick=()=>{$('#vm').innerHTML='';$('#vw').hidden=true};
 
-// --- Photo ---
-$('shot').onclick = () => {
-  if (!canvas.width) return;
-  canvas.toBlob(blob => {
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.src = url;
-    img.title = 'Toucher pour télécharger';
-    img.onclick = () => { const a = document.createElement('a'); a.href = url; a.download = 'funpicture-' + Date.now() + '.png'; a.click(); };
-    $('gallery').prepend(img);
-  }, 'image/png');
-};
-
-$('flip').onclick = () => { facing = facing === 'user' ? 'environment' : 'user'; start(); };
-
-// --- PWA : service worker + bouton d'installation ---
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-
-let deferred;
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; $('install').style.display = 'block'; });
-$('install').onclick = async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; $('install').style.display = 'none'; };
-
-start();
-requestAnimationFrame(draw);
-</script>
-</body>
-</html>
+/* ---------- PWA ---------- */
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+let dp;addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;$('#install').hidden=false});
+$('#install').onclick=async()=>{dp.prompt();await dp.userChoice;$('#install').hidden=true};
+start();requestAnimationFrame(frame);
+</script></body></html>
